@@ -1,0 +1,16 @@
+<h1><a href="#12-7-用-defer-关闭文件" name="12-7-用-defer-关闭文件"></a>12.7 用 defer 关闭文件</h1>
+<p><code>defer</code> 关键字（参看 6.4）对于在函数结束时关闭打开的文件非常有用，例如下面的代码片段：</p>
+<pre><code class="go">func data(name string) string {
+	f, _ := os.OpenFile(name, os.O_RDONLY, 0)
+	defer f.Close() // idiomatic Go code!
+	contents, _ := ioutil.ReadAll(f)
+	return string(contents)
+}
+</code></pre>
+<p>在函数 return 后执行了 <code>f.Close()</code></p>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="12.6.html">用切片读写文件</a></li>
+  <li>下一节：<a href="12.8.html">使用接口的实际例子：fmt.Fprintf</a></li>
+</ul>

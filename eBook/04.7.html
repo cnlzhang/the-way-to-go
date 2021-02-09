@@ -1,0 +1,268 @@
+<h1><a href="#4-7-strings-和-strconv-包" name="4-7-strings-和-strconv-包"></a>4.7 strings 和 strconv 包</h1>
+<p>作为一种基本数据结构，每种语言都有一些对于字符串的预定义处理函数。Go 中使用 <code>strings</code> 包来完成对字符串的主要操作。</p>
+<h2><a href="#4-7-1-前缀和后缀" name="4-7-1-前缀和后缀"></a>4.7.1 前缀和后缀</h2>
+<p><code>HasPrefix</code> 判断字符串 <code>s</code> 是否以 <code>prefix</code> 开头：</p>
+<pre><code class="go">strings.HasPrefix(s, prefix string) bool
+</code></pre>
+<p><code>HasSuffix</code> 判断字符串 <code>s</code> 是否以 <code>suffix</code> 结尾：</p>
+<pre><code class="go">strings.HasSuffix(s, suffix string) bool
+</code></pre>
+<p>示例 4.13 <a href="examples/chapter_4/presuffix.go">presuffix.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;strings&quot;
+)
+
+func main() {
+	var str string = &quot;This is an example of a string&quot;
+	fmt.Printf(&quot;T/F? Does the string \&quot;%s\&quot; have prefix %s? &quot;, str, &quot;Th&quot;)
+	fmt.Printf(&quot;%t\n&quot;, strings.HasPrefix(str, &quot;Th&quot;))
+}
+</code></pre>
+<p>输出：</p>
+<pre><code>T/F? Does the string &quot;This is an example of a string&quot; have prefix Th? true
+</code></pre>
+<p>这个例子同样演示了转义字符 <code>\</code> 和格式化字符串的使用。</p>
+<h2><a href="#4-7-2-字符串包含关系" name="4-7-2-字符串包含关系"></a>4.7.2 字符串包含关系</h2>
+<p><code>Contains</code> 判断字符串 <code>s</code> 是否包含 <code>substr</code>：</p>
+<pre><code class="go">strings.Contains(s, substr string) bool
+</code></pre>
+<h2><a href="#4-7-3-判断子字符串或字符在父字符串中出现的位置-索引-" name="4-7-3-判断子字符串或字符在父字符串中出现的位置-索引-"></a>4.7.3 判断子字符串或字符在父字符串中出现的位置（索引）</h2>
+<p><code>Index</code> 返回字符串 <code>str</code> 在字符串 <code>s</code> 中的索引（<code>str</code> 的第一个字符的索引），-1 表示字符串 <code>s</code> 不包含字符串 <code>str</code>：</p>
+<pre><code class="go">strings.Index(s, str string) int
+</code></pre>
+<p><code>LastIndex</code> 返回字符串 <code>str</code> 在字符串 <code>s</code> 中最后出现位置的索引（<code>str</code> 的第一个字符的索引），-1 表示字符串 <code>s</code> 不包含字符串 <code>str</code>：</p>
+<pre><code class="go">strings.LastIndex(s, str string) int
+</code></pre>
+<p>如果需要查询非 ASCII 编码的字符在父字符串中的位置，建议使用以下函数来对字符进行定位：</p>
+<pre><code class="go">strings.IndexRune(s string, r rune) int
+</code></pre>
+<pre><code>注: 原文为 &quot;If ch is a non-ASCII character use strings.IndexRune(s string, ch int) int.&quot;
+该方法在最新版本的 Go 中定义为 func IndexRune(s string, r rune) int
+实际使用中的第二个参数 rune 可以是 rune 或 int, 例如 strings.IndexRune(&quot;chicken&quot;, 99) 或 strings.IndexRune(&quot;chicken&quot;, rune(&#39;k&#39;))
+</code></pre>
+<p>示例 4.14 <a href="examples/chapter_4/index_in_string.go">index_in_string.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;strings&quot;
+)
+
+func main() {
+	var str string = &quot;Hi, I&#39;m Marc, Hi.&quot;
+
+	fmt.Printf(&quot;The position of \&quot;Marc\&quot; is: &quot;)
+	fmt.Printf(&quot;%d\n&quot;, strings.Index(str, &quot;Marc&quot;))
+
+	fmt.Printf(&quot;The position of the first instance of \&quot;Hi\&quot; is: &quot;)
+	fmt.Printf(&quot;%d\n&quot;, strings.Index(str, &quot;Hi&quot;))
+	fmt.Printf(&quot;The position of the last instance of \&quot;Hi\&quot; is: &quot;)
+	fmt.Printf(&quot;%d\n&quot;, strings.LastIndex(str, &quot;Hi&quot;))
+
+	fmt.Printf(&quot;The position of \&quot;Burger\&quot; is: &quot;)
+	fmt.Printf(&quot;%d\n&quot;, strings.Index(str, &quot;Burger&quot;))
+}
+</code></pre>
+<p>输出：</p>
+<pre><code>The position of &quot;Marc&quot; is: 8
+The position of the first instance of &quot;Hi&quot; is: 0
+The position of the last instance of &quot;Hi&quot; is: 14
+The position of &quot;Burger&quot; is: -1
+</code></pre>
+<h2><a href="#4-7-4-字符串替换" name="4-7-4-字符串替换"></a>4.7.4 字符串替换</h2>
+<p><code>Replace</code> 用于将字符串 <code>str</code> 中的前 <code>n</code> 个字符串 <code>old</code> 替换为字符串 <code>new</code>，并返回一个新的字符串，如果 <code>n = -1</code> 则替换所有字符串 <code>old</code> 为字符串 <code>new</code>：</p>
+<pre><code class="go">strings.Replace(str, old, new, n) string
+</code></pre>
+<h2><a href="#4-7-5-统计字符串出现次数" name="4-7-5-统计字符串出现次数"></a>4.7.5 统计字符串出现次数</h2>
+<p><code>Count</code> 用于计算字符串 <code>str</code> 在字符串 <code>s</code> 中出现的非重叠次数：</p>
+<pre><code class="go">strings.Count(s, str string) int
+</code></pre>
+<p>示例 4.15 <a href="examples/chapter_4/count_substring.go">count_substring.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;strings&quot;
+)
+
+func main() {
+	var str string = &quot;Hello, how is it going, Hugo?&quot;
+	var manyG = &quot;gggggggggg&quot;
+
+	fmt.Printf(&quot;Number of H&#39;s in %s is: &quot;, str)
+	fmt.Printf(&quot;%d\n&quot;, strings.Count(str, &quot;H&quot;))
+
+	fmt.Printf(&quot;Number of double g&#39;s in %s is: &quot;, manyG)
+	fmt.Printf(&quot;%d\n&quot;, strings.Count(manyG, &quot;gg&quot;))
+}
+</code></pre>
+<p>输出：</p>
+<pre><code>Number of H&#39;s in Hello, how is it going, Hugo? is: 2
+Number of double g’s in gggggggggg is: 5
+</code></pre>
+<h2><a href="#4-7-6-重复字符串" name="4-7-6-重复字符串"></a>4.7.6 重复字符串</h2>
+<p><code>Repeat</code> 用于重复 <code>count</code> 次字符串 <code>s</code> 并返回一个新的字符串：</p>
+<pre><code class="go">strings.Repeat(s, count int) string
+</code></pre>
+<p>示例 4.16 <a href="examples/chapter_4/repeat_string.go">repeat_string.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;strings&quot;
+)
+
+func main() {
+	var origS string = &quot;Hi there! &quot;
+	var newS string
+
+	newS = strings.Repeat(origS, 3)
+	fmt.Printf(&quot;The new repeated string is: %s\n&quot;, newS)
+}
+</code></pre>
+<p>输出：</p>
+<pre><code>The new repeated string is: Hi there! Hi there! Hi there!
+</code></pre>
+<h2><a href="#4-7-7-修改字符串大小写" name="4-7-7-修改字符串大小写"></a>4.7.7 修改字符串大小写</h2>
+<p><code>ToLower</code> 将字符串中的 Unicode 字符全部转换为相应的小写字符：</p>
+<pre><code class="go">strings.ToLower(s) string
+</code></pre>
+<p><code>ToUpper</code> 将字符串中的 Unicode 字符全部转换为相应的大写字符：</p>
+<pre><code class="go">strings.ToUpper(s) string
+</code></pre>
+<p>示例 4.17 <a href="examples/chapter_4/toupper_lower.go">toupper_lower.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;strings&quot;
+)
+
+func main() {
+	var orig string = &quot;Hey, how are you George?&quot;
+	var lower string
+	var upper string
+
+	fmt.Printf(&quot;The original string is: %s\n&quot;, orig)
+	lower = strings.ToLower(orig)
+	fmt.Printf(&quot;The lowercase string is: %s\n&quot;, lower)
+	upper = strings.ToUpper(orig)
+	fmt.Printf(&quot;The uppercase string is: %s\n&quot;, upper)
+}
+</code></pre>
+<p>输出：</p>
+<pre><code>The original string is: Hey, how are you George?
+The lowercase string is: hey, how are you george?
+The uppercase string is: HEY, HOW ARE YOU GEORGE?
+</code></pre>
+<h2><a href="#4-7-8-修剪字符串" name="4-7-8-修剪字符串"></a>4.7.8 修剪字符串</h2>
+<p>你可以使用 <code>strings.TrimSpace(s)</code> 来剔除字符串开头和结尾的空白符号；如果你想要剔除指定字符，则可以使用 <code>strings.Trim(s, &quot;cut&quot;)</code> 来将开头和结尾的 <code>cut</code> 去除掉。该函数的第二个参数可以包含任何字符，如果你只想剔除开头或者结尾的字符串，则可以使用 <code>TrimLeft</code> 或者 <code>TrimRight</code> 来实现。</p>
+<h2><a href="#4-7-9-分割字符串" name="4-7-9-分割字符串"></a>4.7.9 分割字符串</h2>
+<p><code>strings.Fields(s)</code> 将会利用 1 个或多个空白符号来作为动态长度的分隔符将字符串分割成若干小块，并返回一个 slice，如果字符串只包含空白符号，则返回一个长度为 0 的 slice。</p>
+<p><code>strings.Split(s, sep)</code> 用于自定义分割符号来对指定字符串进行分割，同样返回 slice。</p>
+<p>因为这 2 个函数都会返回 slice，所以习惯使用 for-range 循环来对其进行处理（第 7.3 节）。</p>
+<h2><a href="#4-7-10-拼接-slice-到字符串" name="4-7-10-拼接-slice-到字符串"></a>4.7.10 拼接 slice 到字符串</h2>
+<p><code>Join</code> 用于将元素类型为 string 的 slice 使用分割符号来拼接组成一个字符串：</p>
+<pre><code class="go">strings.Join(sl []string, sep string) string
+</code></pre>
+<p>示例 4.18 <a href="examples/chapter_4/strings_splitjoin.go">strings_splitjoin.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;strings&quot;
+)
+
+func main() {
+	str := &quot;The quick brown fox jumps over the lazy dog&quot;
+	sl := strings.Fields(str)
+	fmt.Printf(&quot;Splitted in slice: %v\n&quot;, sl)
+	for _, val := range sl {
+		fmt.Printf(&quot;%s - &quot;, val)
+	}
+	fmt.Println()
+	str2 := &quot;GO1|The ABC of Go|25&quot;
+	sl2 := strings.Split(str2, &quot;|&quot;)
+	fmt.Printf(&quot;Splitted in slice: %v\n&quot;, sl2)
+	for _, val := range sl2 {
+		fmt.Printf(&quot;%s - &quot;, val)
+	}
+	fmt.Println()
+	str3 := strings.Join(sl2,&quot;;&quot;)
+	fmt.Printf(&quot;sl2 joined by ;: %s\n&quot;, str3)
+}
+</code></pre>
+<p>输出：</p>
+<pre><code>Splitted in slice: [The quick brown fox jumps over the lazy dog]
+The - quick - brown - fox - jumps - over - the - lazy - dog -
+Splitted in slice: [GO1 The ABC of Go 25]
+GO1 - The ABC of Go - 25 -
+sl2 joined by ;: GO1;The ABC of Go;25
+</code></pre>
+<p>其它有关字符串操作的文档请参阅 <a href="http://golang.org/pkg/strings/">官方文档</a>（ <strong>译者注：国内用户可访问 <a href="http://docs.studygolang.com/pkg/strings/">该页面</a></strong> ）。</p>
+<h2><a href="#4-7-11-从字符串中读取内容" name="4-7-11-从字符串中读取内容"></a>4.7.11 从字符串中读取内容</h2>
+<p>函数 <code>strings.NewReader(str)</code> 用于生成一个 <code>Reader</code> 并读取字符串中的内容，然后返回指向该 <code>Reader</code> 的指针，从其它类型读取内容的函数还有：</p>
+<ul>
+  <li><code>Read()</code> 从 []byte 中读取内容。</li>
+  <li><code>ReadByte()</code> 和 <code>ReadRune()</code> 从字符串中读取下一个 byte 或者 rune。</li>
+</ul>
+<h2><a href="#4-7-12-字符串与其它类型的转换" name="4-7-12-字符串与其它类型的转换"></a>4.7.12 字符串与其它类型的转换</h2>
+<p>与字符串相关的类型转换都是通过 <code>strconv</code> 包实现的。</p>
+<p>该包包含了一些变量用于获取程序运行的操作系统平台下 int 类型所占的位数，如：<code>strconv.IntSize</code>。</p>
+<p>任何类型 <strong>T</strong> 转换为字符串总是成功的。</p>
+<p>针对从数字类型转换到字符串，Go 提供了以下函数：</p>
+<ul>
+  <li><code>strconv.Itoa(i int) string</code> 返回数字 i 所表示的字符串类型的十进制数。</li>
+  <li><code>strconv.FormatFloat(f float64, fmt byte, prec int, bitSize int) string</code> 将 64 位浮点型的数字转换为字符串，其中 <code>fmt</code> 表示格式（其值可以是 <code>&#39;b&#39;</code>、<code>&#39;e&#39;</code>、<code>&#39;f&#39;</code> 或 <code>&#39;g&#39;</code>），<code>prec</code> 表示精度，<code>bitSize</code> 则使用 32 表示 float32，用 64 表示 float64。</li>
+</ul>
+<p>将字符串转换为其它类型 <strong>tp</strong> 并不总是可能的，可能会在运行时抛出错误 <code>parsing &quot;…&quot;: invalid argument</code>。</p>
+<p>针对从字符串类型转换为数字类型，Go 提供了以下函数：</p>
+<ul>
+  <li><code>strconv.Atoi(s string) (i int, err error)</code> 将字符串转换为 int 型。</li>
+  <li><code>strconv.ParseFloat(s string, bitSize int) (f float64, err error)</code> 将字符串转换为 float64 型。</li>
+</ul>
+<p>利用多返回值的特性，这些函数会返回 2 个值，第 1 个是转换后的结果（如果转换成功），第 2 个是可能出现的错误，因此，我们一般使用以下形式来进行从字符串到其它类型的转换：</p>
+<pre><code>val, err = strconv.Atoi(s)
+</code></pre>
+<p>在下面这个示例中，我们忽略可能出现的转换错误：</p>
+<p>示例 4.19 <a href="examples/chapter_4/string_conversion.go">string_conversion.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;strconv&quot;
+)
+
+func main() {
+	var orig string = &quot;666&quot;
+	var an int
+	var newS string
+
+	fmt.Printf(&quot;The size of ints is: %d\n&quot;, strconv.IntSize)	  
+
+	an, _ = strconv.Atoi(orig)
+	fmt.Printf(&quot;The integer is: %d\n&quot;, an) 
+	an = an + 5
+	newS = strconv.Itoa(an)
+	fmt.Printf(&quot;The new string is: %s\n&quot;, newS)
+}
+</code></pre>
+<p>输出：</p>
+<pre><code>64 位系统：
+The size of ints is: 64
+32 位系统：
+The size of ints is: 32
+The integer is: 666
+The new string is: 671
+</code></pre>
+<p>在第 5.1 节，我们将会利用 if 语句来对可能出现的错误进行分类处理。</p>
+<p>更多有关该包的讨论，请参阅 <a href="http://golang.org/pkg/strconv/">官方文档</a>（ <strong>译者注：国内用户可访问 <a href="http://docs.studygolang.com/pkg/strconv/">该页面</a></strong> ）。</p>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="04.6.html">字符串</a></li>
+  <li>下一节：<a href="04.8.html">时间和日期</a></li>
+</ul>

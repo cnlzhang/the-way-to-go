@@ -1,0 +1,18 @@
+<h1><a href="#18-10-其他" name="18-10-其他"></a>18.10 其他</h1>
+<p>如何在程序出错时终止程序：</p>
+<pre><code class="go	">if err != nil {
+   fmt.Printf(&quot;Program stopping with error %v&quot;, err)
+   os.Exit(1)
+}
+</code></pre>
+<p>或者：</p>
+<pre><code class="go">if err != nil { 
+	panic(&quot;ERROR occurred: &quot; + err.Error())
+}
+</code></pre>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="18.9.html">网络和网页应用</a></li>
+  <li>下一节：<a href="18.11.html">出于性能考虑的最佳实践和建议</a></li>
+</ul>

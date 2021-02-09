@@ -1,0 +1,40 @@
+<h1><a href="#10-4-带标签的结构体" name="10-4-带标签的结构体"></a>10.4 带标签的结构体</h1>
+<p>结构体中的字段除了有名字和类型外，还可以有一个可选的标签（tag）：它是一个附属于字段的字符串，可以是文档或其他的重要标记。标签的内容不可以在一般的编程中使用，只有包 <code>reflect</code> 能获取它。我们将在下一章（第 <a href="11.10.html">11.10 节</a>）中深入的探讨 <code>reflect</code>包，它可以在运行时自省类型、属性和方法，比如：在一个变量上调用 <code>reflect.TypeOf()</code> 可以获取变量的正确类型，如果变量是一个结构体类型，就可以通过 Field 来索引结构体的字段，然后就可以使用 Tag 属性。</p>
+<p>示例 10.7 <a href="examples/chapter_10/struct_tag.go">struct_tag.go</a>：</p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;reflect&quot;
+)
+
+type TagType struct { // tags
+	field1 bool   &quot;An important answer&quot;
+	field2 string &quot;The name of the thing&quot;
+	field3 int    &quot;How much there are&quot;
+}
+
+func main() {
+	tt := TagType{true, &quot;Barak Obama&quot;, 1}
+	for i := 0; i &lt; 3; i++ {
+		refTag(tt, i)
+	}
+}
+
+func refTag(tt TagType, ix int) {
+	ttType := reflect.TypeOf(tt)
+	ixField := ttType.Field(ix)
+	fmt.Printf(&quot;%v\n&quot;, ixField.Tag)
+}
+</code></pre>
+<p>输出：</p>
+<pre><code>An important answer
+The name of the thing
+How much there are
+</code></pre>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="10.3.html">使用自定义包中的结构体</a></li>
+  <li>下一节：<a href="10.5.html">匿名字段和内嵌结构体</a></li>
+</ul>

@@ -1,0 +1,31 @@
+<h1><a href="#15-10-基于网络的通道-netchan" name="15-10-基于网络的通道-netchan"></a>15.10 基于网络的通道 netchan</h1>
+<p>备注：Go 团队决定改进并重新打造 <code>netchan</code> 包的现有版本，它已被移至 <code>old/netchan</code>。<code>old/</code> 目录用于存放过时的包代码，它们不会成为 Go 1.x 的一部分。本节仅出于向后兼容性讨论 <code>netchan</code> 包的概念。</p>
+<p>一项和 <code>rpc</code> 密切相关的技术是基于网络的通道。类似 14 章所使用的通道都是本地的，它们仅存在于被执行的机器内存空间中。<code>netchan</code> 包实现了类型安全的网络化通道：它允许一个通道两端出现由网络连接的不同计算机。其实现原理是，在其中一台机器上将传输数据发送到通道中，那么就可以被另一台计算机上同类型的通道接收。一个导出器（<code>exporter</code>）会按名称发布（一组）通道。导入器（<code>importer</code>）连接到导出的机器，并按名称导入这些通道。之后，两台机器就可按通常的方式来使用通道。网络通道不是同步的，它们类似于带缓存的通道。</p>
+<p>发送端示例代码如下：</p>
+<pre><code class="go">exp, err := netchan.NewExporter(&quot;tcp&quot;, &quot;netchanserver.mydomain.com:1234&quot;)
+if err != nil {
+	log.Fatalf(&quot;Error making Exporter: %v&quot;, err)
+}
+ch := make(chan myType)
+err := exp.Export(&quot;sendmyType&quot;, ch, netchan.Send)
+if err != nil {
+	log.Fatalf(&quot;Send Error: %v&quot;, err)
+}
+</code></pre>
+<p>接收端示例代码如下：</p>
+<pre><code class="go">imp, err := netchan.NewImporter(&quot;tcp&quot;, &quot;netchanserver.mydomain.com:1234&quot;)
+if err != nil {
+	log.Fatalf(&quot;Error making Importer: %v&quot;, err)
+}
+ch := make(chan myType)
+err = imp.Import(&quot;sendmyType&quot;, ch, netchan.Receive)
+if err != nil {
+	log.Fatalf(&quot;Receive Error: %v&quot;, err)
+}
+</code></pre>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="15.9.html">用 rpc 实现远程过程调用</a></li>
+  <li>下一节：<a href="15.11.html">与 websocket 通信</a></li>
+</ul>

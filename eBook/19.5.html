@@ -1,0 +1,112 @@
+<h1><a href="#版本-2-添加持久化存储" name="版本-2-添加持久化存储"></a>版本 2 - 添加持久化存储</h1>
+<p>第 2 个版本的代码 <em>goto_v2</em> 见 <a href="examples/chapter_19/goto_v2">goto_v2</a>。</p>
+<h1><a href="#19-5-持久化存储-gob" name="19-5-持久化存储-gob"></a>19.5 持久化存储：gob</h1>
+<p>（本节代码见 <a href="examples/chapter_19/goto_v2/store.go">goto_v2/store.go</a> 和 <a href="examples/chapter_19/goto_v2/main.go">goto_v2/main.go</a>。）</p>
+<p>当 goto 进程（监听在 8080 端口的 web 服务器）终止，这迟早会发生，内存 map 中缩短的 URL 就会丢失。要保留这些数据，就得将其保存到磁盘文件中。我们将修改 <code>URLStore</code>，使它可以保存数据到文件，且在 goto 启动时还原这些数据。为此我们使用 Go 标准库的 <code>encoding/gob</code> 包：它用于序列化和反序列化，将数据结构转换为字节数组（确切地说是切片），反之亦然（见 <a href="12.11.html">12.11 节</a>）。</p>
+<p>通过 <code>gob</code> 包的 <code>NewEncoder</code> 和 <code>NewDecoder</code> 函数，可以指定数据要写入或读取的位置。返回的 <code>Encoder</code> 和 <code>Decoder</code> 对象提供了 <code>Encode</code> 和 <code>Decode</code> 方法，用于对文件写入和从中读取 Go 数据结构。提示：<code>Encoder</code> 实现了 <code>Writer</code> 接口，同样 <code>Decoder</code> 实现了 <code>Reader</code> 接口。我们在 <code>URLStore</code> 上增加一个新的 <code>file</code> 字段（<code>*os.File</code> 类型），它是用于读写已打开文件的句柄。</p>
+<pre><code class="go">type URLStore struct {
+	urls map[string]string
+	mu sync.RWMutex
+	file *os.File
+}
+</code></pre>
+<p>我们把这个文件命名为 store.gob，当初始化 <code>URLStore</code> 时将其作为参数传入：</p>
+<pre><code class="go">var store = NewURLStore(&quot;store.gob&quot;)
+</code></pre>
+<p>接着，调整 <code>NewURLStore</code> 函数：</p>
+<pre><code class="go">func NewURLStore(filename string) *URLStore {
+	s := &amp;URLStore{urls: make(map[string]string)}
+	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatal(&quot;URLStore:&quot;, err)
+	}
+	s.file = f
+	return s
+}
+</code></pre>
+<p>现在，更新后的 <code>NewURLStore</code> 函数接受一个文件名参数，它会打开该文件（见 <a href="12.0.html">12 章</a>），将返回的 <code>*os.File</code> 作为 <code>file</code> 字段的值存储在 <code>URLStore</code> 变量 <code>store</code> 中，即这里的本地变量 <code>s</code> 。</p>
+<p>对 <code>OpenFile</code> 的调用可能会失败（例如文件可能被删除或改名）。它会返回一个错误 err，注意 Go 是如何处理这种情况的：</p>
+<pre><code class="go">f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+if err != nil {
+	log.Fatal(&quot;URLStore:&quot;, err)
+}
+</code></pre>
+<p>当 err 不为 <code>nil</code>，表示确实发生了错误，那么输出一条消息并停止程序执行。这是处理错误的一种方式，大多数情况下错误应该返回给调用函数，但这种检测错误的模式在 Go 代码中也很普遍。在 <code>}</code> 之后可以确定文件被成功打开了。</p>
+<p>打开该文件时启用了写入标志，更精确地说是“追加模式”。每当一对新的短/长 URL 在程序中创建后，我们通过 <code>gob</code> 把它存储到文件 "store.gob" 中。</p>
+<p>为达到目的，定义一个新的结构体类型 <code>record</code>：</p>
+<pre><code class="go">type record struct {
+	Key, URL string
+}
+</code></pre>
+<p>以及新的 <code>save</code> 方法，将给定的键和 URL 组成 <code>record</code> ，以 <code>gob</code> 编码的形式写入磁盘。</p>
+<pre><code class="go">func (s *URLStore) save(key, url string) error {
+	e := gob.NewEncoder(s.file)
+	return e.Encode(record{key, url})
+}
+</code></pre>
+<p>goto 程序启动时，磁盘上存储的数据必须读取到 <code>URLStore</code> 的 map 中。为此，我们编写 <code>load</code> 方法：</p>
+<pre><code class="go">func (s *URLStore) load() error {
+	if _, err := s.file.Seek(0, 0); err != nil {
+		return err
+	}
+	d := gob.NewDecoder(s.file)
+	var err error
+	for err == nil {
+		var r record
+		if err = d.Decode(&amp;r); err == nil {
+			s.Set(r.Key, r.URL)
+		}
+	}
+	if err == io.EOF {
+		return nil
+	}
+	return err
+}
+</code></pre>
+<p>这个新的 <code>load</code> 方法会寻址（<code>Seek</code>）到文件的起始位置，读取并解码（<code>Decode</code>）每一条记录（<code>record</code>），然后用 <code>Set</code> 方法将数据存储到 map 中。再次注意无处不在的错误处理模式。文件的解码由一个无限循环完成，只要没有错误就会一直继续：</p>
+<pre><code class="go">for err == nil {
+	…
+}
+</code></pre>
+<p>如果得到了一个错误，可能是刚解码了最后一条记录，于是产生了 <code>io.EOF</code>（EndOfFile） 错误。若并非此种错误，表示产生了解码错误，用 <code>return err</code> 来返回它。对该方法的调用必须加入到 <code>NewURLStore</code> 中：</p>
+<pre><code class="go">func NewURLStore(filename string) *URLStore {
+	s := &amp;URLStore{urls: make(map[string]string)}
+	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatal(&quot;Error opening URLStore:&quot;, err)
+	}
+	s.file = f
+	if err := s.load(); err != nil {
+		log.Println(&quot;Error loading data in URLStore:&quot;, err)
+	}
+	return s
+}
+</code></pre>
+<p>同时在 <code>Put</code> 方法中，当新的 URL 对加入到 map 中，也应该立即将它们保存到数据文件中：</p>
+<pre><code class="go">func (s *URLStore) Put(url string) string {
+	for {
+		key := genKey(s.Count())
+		if s.Set(key, url) {
+			if err := s.save(key, url); err != nil {
+				log.Println(&quot;Error saving to URLStore:&quot;, err)
+			}
+			return key
+		}
+	}
+	panic(&quot;shouldn’t get here&quot;)
+}
+</code></pre>
+<p>编译并测试这第二个版本的程序，或直接使用现有的可执行程序，验证关闭服务器（在终端窗口可以按 CTRL/C）并重启后，短 URL 仍然有效。goto 程序第一次启动时，文件 store.gob 还不存在，因此当载入数据时会得到错误：</p>
+<pre><code>2011/09/11 11:08:11 Error loading URLStore: open store.gob: The system cannot find the file specified.
+</code></pre>
+<p>结束进程并重启后，就能正常工作了。或者，可以在 goto 启动前先创建空的 store.gob 文件。</p>
+<p><strong>备注：</strong> 当第二次启动 goto 时，可能会产生错误：</p>
+<pre><code>Error loading URLStore: extra data in buffer
+</code></pre>
+<p>这是由于 <code>gob</code> 是基于流的协议，它不支持重新开始。在版本 4 中，会用 json 作为存储协议来补救此问题。</p>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="19.4.html">用户界面：web 服务端</a></li>
+  <li>下一节：<a href="19.6.html">用协程优化性能</a></li>
+</ul>

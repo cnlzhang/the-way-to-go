@@ -1,0 +1,226 @@
+<h1><a href="#14-10-复用" name="14-10-复用"></a>14.10 复用</h1>
+<h2><a href="#14-10-1-典型的客户端-服务器-c-s-模式" name="14-10-1-典型的客户端-服务器-c-s-模式"></a>14.10.1 典型的客户端/服务器（C/S）模式</h2>
+<p>客户端-服务器应用正是 goroutines 和 channels 的亮点所在。</p>
+<p>客户端(Client)可以是运行在任意设备上的任意程序，它会按需发送请求(request)至服务器。服务器(Server)接收到这个请求后开始相应的工作，然后再将响应(response)返回给客户端。典型情况下一般是多个客户端（即多个请求）对应一个（或少量）服务器。例如我们日常使用的浏览器客户端，其功能就是向服务器请求网页。而Web服务器则会向浏览器响应网页数据。</p>
+<p>使用Go的服务器通常会在协程中执行向客户端的响应，故而会对每一个客户端请求启动一个协程。一个常用的操作方法是客户端请求自身中包含一个通道，而服务器则向这个通道发送响应。</p>
+<p>例如下面这个<code>Request</code>结构，其中内嵌了一个<code>replyc</code>通道。</p>
+<pre><code class="go">type Request struct {
+    a, b      int    
+    replyc    chan int // reply channel inside the Request
+}
+</code></pre>
+<p>或者更通俗的：</p>
+<pre><code class="go">type Reply struct{...}
+type Request struct{
+    arg1, arg2, arg3 some_type
+    replyc chan *Reply
+}
+</code></pre>
+<p>接下来先使用简单的形式,服务器会为每一个请求启动一个协程并在其中执行<code>run()</code>函数，此举会将类型为<code>binOp</code>的<code>op</code>操作返回的int值发送到<code>replyc</code>通道。</p>
+<pre><code class="go">type binOp func(a, b int) int
+
+func run(op binOp, req *Request) {
+    req.replyc &lt;- op(req.a, req.b)
+}
+</code></pre>
+<p><code>server</code>协程会无限循环以从<code>chan *Request</code>接收请求，并且为了避免被长时间操作所堵塞，它将为每一个请求启动一个协程来做具体的工作：</p>
+<pre><code class="go">func server(op binOp, service chan *Request) {
+    for {
+        req := &lt;-service; // requests arrive here  
+        // start goroutine for request:        
+        go run(op, req);  // don’t wait for op to complete    
+    }
+}
+</code></pre>
+<p><code>server</code>本身则是以协程的方式在<code>startServer</code>函数中启动：</p>
+<pre><code class="go">func startServer(op binOp) chan *Request {
+    reqChan := make(chan *Request);
+    go server(op, reqChan);
+    return reqChan;
+}
+</code></pre>
+<p><code>startServer</code>则会在<code>main</code>协程中被调用。</p>
+<p>在以下测试例子中，100个请求会被发送到服务器，只有它们全部被送达后我们才会按相反的顺序检查响应：</p>
+<pre><code class="go">func main() {
+    adder := startServer(func(a, b int) int { return a + b })
+    const N = 100
+    var reqs [N]Request
+    for i := 0; i &lt; N; i++ {
+        req := &amp;reqs[i]
+        req.a = i
+        req.b = i + N
+        req.replyc = make(chan int)
+        adder &lt;- req  // adder is a channel of requests
+    }
+    // checks:
+    for i := N - 1; i &gt;= 0; i-- {
+        // doesn’t matter what order
+        if &lt;-reqs[i].replyc != N+2*i {
+            fmt.Println(“fail at”, i)
+        } else {
+            fmt.Println(“Request “, i, “is ok!”)
+        }
+    }
+    fmt.Println(“done”)
+}
+</code></pre>
+<p>这些代码可以在<a href="examples/chapter_14/multiplex_server.go">multiplex_server.go</a>找到</p>
+<p>输出：</p>
+<pre><code>Request 99 is ok!
+Request 98 is ok!
+...
+Request 1 is ok!
+Request 0 is ok!
+done
+</code></pre>
+<p>这个程序仅启动了100个协程。然而即使执行100,000个协程我们也能在数秒内看到它完成。这说明了Go的协程是如何的轻量：如果我们启动相同数量的真实的线程，程序早就崩溃了。</p>
+<p>示例： <a href="examples/chapter_14/multiplex_server.go">14.14-multiplex_server.go</a></p>
+<pre><code class="go">package main
+
+import &quot;fmt&quot;
+
+type Request struct {
+	a, b   int
+	replyc chan int // reply channel inside the Request
+}
+
+type binOp func(a, b int) int
+
+func run(op binOp, req *Request) {
+	req.replyc &lt;- op(req.a, req.b)
+}
+
+func server(op binOp, service chan *Request) {
+	for {
+		req := &lt;-service // requests arrive here
+		// start goroutine for request:
+		go run(op, req) // don&#39;t wait for op
+	}
+}
+
+func startServer(op binOp) chan *Request {
+	reqChan := make(chan *Request)
+	go server(op, reqChan)
+	return reqChan
+}
+
+func main() {
+	adder := startServer(func(a, b int) int { return a + b })
+	const N = 100
+	var reqs [N]Request
+	for i := 0; i &lt; N; i++ {
+		req := &amp;reqs[i]
+		req.a = i
+		req.b = i + N
+		req.replyc = make(chan int)
+		adder &lt;- req
+	}
+	// checks:
+	for i := N - 1; i &gt;= 0; i-- { // doesn&#39;t matter what order
+		if &lt;-reqs[i].replyc != N+2*i {
+			fmt.Println(&quot;fail at&quot;, i)
+		} else {
+			fmt.Println(&quot;Request &quot;, i, &quot; is ok!&quot;)
+		}
+	}
+	fmt.Println(&quot;done&quot;)
+}
+
+</code></pre>
+<h2><a href="#14-10-2-卸载-teardown-通过信号通道关闭服务器" name="14-10-2-卸载-teardown-通过信号通道关闭服务器"></a>14.10.2 卸载（Teardown）：通过信号通道关闭服务器</h2>
+<p>在上一个版本中<code>server</code>在<code>main</code>函数返回后并没有完全关闭，而被强制结束了。为了改进这一点，我们可以提供一个退出通道给<code>server</code>：</p>
+<pre><code class="go">func startServer(op binOp) (service chan *Request, quit chan bool) {
+    service = make(chan *Request)
+    quit = make(chan bool)
+    go server(op, service, quit)
+    return service, quit
+}
+</code></pre>
+<p><code>server</code>函数现在则使用<code>select</code>在<code>service</code>通道和<code>quit</code>通道之间做出选择：</p>
+<pre><code class="go">func server(op binOp, service chan *request, quit chan bool) {
+    for {
+        select {
+            case req := &lt;-service:
+                go run(op, req) 
+            case &lt;-quit:
+                return   
+        }
+    }
+}
+</code></pre>
+<p>当<code>quit</code>通道接收到一个<code>true</code>值时，<code>server</code>就会返回并结束。</p>
+<p>在<code>main</code>函数中我们做出如下更改：</p>
+<pre><code>adder, quit := startServer(func(a, b int) int { return a + b })
+</code></pre>
+<p>在<code>main</code>函数的结尾处我们放入这一行：<code>quit &lt;- true</code></p>
+<p>完整的代码在 multiplex_server2.go,输出和上一个版本是一样的。</p>
+<p>示例： <a href="examples/chapter_14/multiplex_server2.go">14.15-multiplex_server2.go</a></p>
+<pre><code class="go">package main
+
+import &quot;fmt&quot;
+
+type Request struct {
+	a, b   int
+	replyc chan int // reply channel inside the Request
+}
+
+type binOp func(a, b int) int
+
+func run(op binOp, req *Request) {
+	req.replyc &lt;- op(req.a, req.b)
+}
+
+func server(op binOp, service chan *Request, quit chan bool) {
+	for {
+		select {
+		case req := &lt;-service:
+			go run(op, req)
+		case &lt;-quit:
+			return
+		}
+	}
+}
+
+func startServer(op binOp) (service chan *Request, quit chan bool) {
+	service = make(chan *Request)
+	quit = make(chan bool)
+	go server(op, service, quit)
+	return service, quit
+}
+
+func main() {
+	adder, quit := startServer(func(a, b int) int { return a + b })
+	const N = 100
+	var reqs [N]Request
+	for i := 0; i &lt; N; i++ {
+		req := &amp;reqs[i]
+		req.a = i
+		req.b = i + N
+		req.replyc = make(chan int)
+		adder &lt;- req
+	}
+	// checks:
+	for i := N - 1; i &gt;= 0; i-- { // doesn&#39;t matter what order
+		if &lt;-reqs[i].replyc != N+2*i {
+			fmt.Println(&quot;fail at&quot;, i)
+		} else {
+			fmt.Println(&quot;Request &quot;, i, &quot; is ok!&quot;)
+		}
+	}
+	quit &lt;- true
+	fmt.Println(&quot;done&quot;)
+}
+</code></pre>
+<p>练习 <a href="exercises/chapter_14/multiplex_server3.go">14.13 multiplex_server3.go</a>:使用之前的例子，编写一个在<code>Request</code>结构上带有<code>String()</code>方法的版本，它能决定服务器如何输出；并使用以下两个请求来测试这个程序：</p>
+<pre><code class="go    ">    req1 := &amp;Request{3, 4, make(chan int)}
+    req2 := &amp;Request{150, 250, make(chan int)}
+    ...
+    // show the output
+    fmt.Println(req1,&quot;\n&quot;,req2)
+</code></pre>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="14.9.html">实现 Futures 模式</a></li>
+  <li>下一节：<a href="14.11.html">限制同时处理的请求数</a></li>
+</ul>

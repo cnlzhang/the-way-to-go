@@ -1,0 +1,32 @@
+<h1><a href="#18-5-接口" name="18-5-接口"></a>18.5 接口</h1>
+<p>（1）如何检测一个值<code>v</code>是否实现了接口<code>Stringer</code>：</p>
+<pre><code class="go">if v, ok := v.(Stringer); ok {
+    fmt.Printf(&quot;implements String(): %s\n&quot;, v.String())
+}
+</code></pre>
+<p>（2）如何使用接口实现一个类型分类函数：</p>
+<pre><code class="go">func classifier(items ...interface{}) {
+    for i, x := range items {
+        switch x.(type) {
+        case bool:
+            fmt.Printf(&quot;param #%d is a bool\n&quot;, i)
+        case float64:
+            fmt.Printf(&quot;param #%d is a float64\n&quot;, i)
+        case int, int64:
+            fmt.Printf(&quot;param #%d is an int\n&quot;, i)
+        case nil:
+            fmt.Printf(&quot;param #%d is nil\n&quot;, i)
+        case string:
+            fmt.Printf(&quot;param #%d is a string\n&quot;, i)
+        default:
+            fmt.Printf(&quot;param #%d’s type is unknown\n&quot;, i)
+        }
+    }
+}
+</code></pre>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="18.4.html">结构体</a></li>
+  <li>下一节：<a href="18.6.html">函数</a></li>
+</ul>

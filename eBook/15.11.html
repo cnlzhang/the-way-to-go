@@ -1,0 +1,72 @@
+<h1><a href="#15-11-与-websocket-通信" name="15-11-与-websocket-通信"></a>15.11 与 websocket 通信</h1>
+<p>备注：Go 团队决定从 Go 1 起，将 <code>websocket</code> 包移出 Go 标准库，转移到 <code>code.google.com/p/go</code> 下的子项目 <code>websocket</code>，同时预计近期将做重大更改。</p>
+<p><code>import &quot;websocket&quot;</code> 这行要改成：</p>
+<pre><code class="go">import websocket &quot;code.google.com/p/go/websocket&quot;
+</code></pre>
+<p>与 http 协议相反，websocket 是通过客户端与服务器之间的对话，建立的基于单个持久连接的协议。然而在其他方面，其功能几乎与 http 相同。在示例 15.24 中，我们有一个典型的 websocket 服务器，他会自启动并监听 websocket 客户端的连入。示例 15.25 演示了 5 秒后会终止的客户端代码。当连接到来时，服务器先打印 <code>new connection</code>，当客户端停止时，服务器打印 <code>EOF =&gt; closing connection</code>。</p>
+<p>示例 15.24 <a href="examples/chapter_15/websocket_server.go">websocket_server.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;websocket&quot;
+)
+
+func server(ws *websocket.Conn) {
+	fmt.Printf(&quot;new connection\n&quot;)
+	buf := make([]byte, 100)
+	for {
+		if _, err := ws.Read(buf); err != nil {
+			fmt.Printf(&quot;%s&quot;, err.Error())
+			break
+		}
+	}
+	fmt.Printf(&quot; =&gt; closing connection\n&quot;)
+	ws.Close()
+}
+
+func main() {
+	http.Handle(&quot;/websocket&quot;, websocket.Handler(server))
+	err := http.ListenAndServe(&quot;:12345&quot;, nil)
+	if err != nil {
+		panic(&quot;ListenAndServe: &quot; + err.Error())
+	}
+}
+</code></pre>
+<p>示例 15.25 <a href="examples/chapter_15/websocket_client.go">websocket_client.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;time&quot;
+	&quot;websocket&quot;
+)
+
+func main() {
+	ws, err := websocket.Dial(&quot;ws://localhost:12345/websocket&quot;, &quot;&quot;,
+		&quot;http://localhost/&quot;)
+	if err != nil {
+		panic(&quot;Dial: &quot; + err.Error())
+	}
+	go readFromServer(ws)
+	time.Sleep(5e9)
+    ws.Close()
+}
+
+func readFromServer(ws *websocket.Conn) {
+	buf := make([]byte, 1000)
+	for {
+		if _, err := ws.Read(buf); err != nil {
+			fmt.Printf(&quot;%s\n&quot;, err.Error())
+			break
+		}
+	}
+}
+</code></pre>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="15.10.html">基于网络的通道 netchan</a></li>
+  <li>下一节：<a href="15.12.html">用 smtp 发送邮件</a></li>
+</ul>

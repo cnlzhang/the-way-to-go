@@ -1,0 +1,57 @@
+<h1><a href="#11-11-printf-和反射" name="11-11-printf-和反射"></a>11.11 Printf 和反射</h1>
+<p>在 Go 语言的标准库中，前几节所述的反射的功能被大量地使用。举个例子，fmt 包中的 Printf（以及其他格式化输出函数）都会使用反射来分析它的 <code>...</code> 参数。</p>
+<p>Printf 的函数声明为：</p>
+<pre><code class="go">func Printf(format string, args ... interface{}) (n int, err error)
+</code></pre>
+<p>Printf 中的 <code>...</code> 参数为空接口类型。Printf 使用反射包来解析这个参数列表。所以，Printf 能够知道它每个参数的类型。因此格式化字符串中只有%d而没有 %u 和 %ld，因为它知道这个参数是 unsigned 还是 long。这也是为什么 Print 和 Println 在没有格式字符串的情况下还能如此漂亮地输出。</p>
+<p>为了让大家更加具体地了解 Printf 中的反射，我们实现了一个简单的通用输出函数。其中使用了 type-switch 来推导参数类型，并根据类型来输出每个参数的值（这里用了 10.7 节中练习 10.13 的部分代码）</p>
+<p>示例 11.15 <a href="examples/chapter_11/print.go">print.go</a>：</p>
+<pre><code class="go">package main
+
+import (
+	&quot;os&quot;
+	&quot;strconv&quot;
+)
+
+type Stringer interface {
+	String() string
+}
+
+type Celsius float64
+
+func (c Celsius) String() string {
+	return strconv.FormatFloat(float64(c),&#39;f&#39;, 1, 64) + &quot; °C&quot;
+}
+
+type Day int
+
+var dayName = []string{&quot;Monday&quot;, &quot;Tuesday&quot;, &quot;Wednesday&quot;, &quot;Thursday&quot;, &quot;Friday&quot;, &quot;Saturday&quot;, &quot;Sunday&quot;}
+
+func (day Day) String() string {
+	return dayName[day]
+}
+
+func print(args ...interface{}) {
+	for i, arg := range args {
+		if i &gt; 0 {os.Stdout.WriteString(&quot; &quot;)}
+		switch a := arg.(type) { // type switch
+			case Stringer:	os.Stdout.WriteString(a.String())
+			case int:		os.Stdout.WriteString(strconv.Itoa(a))
+			case string:	os.Stdout.WriteString(a)
+			// more types
+			default:		os.Stdout.WriteString(&quot;???&quot;)
+		}
+	}
+}
+
+func main() {
+	print(Day(1), &quot;was&quot;, Celsius(18.36))  // Tuesday was 18.4 °C
+}
+</code></pre>
+<p>在 12.8 节中我们将阐释 <code>fmt.Fprintf()</code> 是怎么运用同样的反射原则的。</p>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="11.10.html">反射包</a></li>
+  <li>下一节：<a href="11.12.html">接口和动态类型</a></li>
+</ul>

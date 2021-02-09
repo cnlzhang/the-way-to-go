@@ -1,0 +1,52 @@
+<h1><a href="#14-16-对go协程进行基准测试" name="14-16-对go协程进行基准测试"></a>14.16 对Go协程进行基准测试</h1>
+<p>在 <a href="13.7.html">13.7 节</a> 我们提到了在Go语言中对你的函数进行基准测试。在此我们将其应用到一个用协程向通道写入整数再读出的实例中。这个函数将通过<code>testing.Benchmark</code>调用<code>N</code>次（例如：<code>N = 1,000,000</code>），<code>BenchMarkResult</code>有一个<code>String()</code>方法来输出其结果。<code>N</code>的值将由<code>gotest</code>来判断并取得一个足够大的数字，以获得合理的基准测试结果。当然同样的基准测试方法也适用于普通函数。</p>
+<p>如果你想排除指定部分的代码或者更具体的指定要测试的部分，可以使用<code>testing.B.startTimer()</code>和<code>testing.B.stopTimer()</code>来开始或结束计时器。基准测试只有在所有的测试通过后才能运行！ </p>
+<p>示例：<a href="examples/chapter_14/benchmark_channels.go">14.18-benchmark_channels.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;testing&quot;
+)
+
+func main() {
+	fmt.Println(&quot; sync&quot;, testing.Benchmark(BenchmarkChannelSync).String())
+	fmt.Println(&quot;buffered&quot;, testing.Benchmark(BenchmarkChannelBuffered).String())
+}
+
+func BenchmarkChannelSync(b *testing.B) {
+	ch := make(chan int)
+	go func() {
+		for i := 0; i &lt; b.N; i++ {
+			ch &lt;- i
+		}
+		close(ch)
+	}()
+	for range ch {
+	}
+}
+
+func BenchmarkChannelBuffered(b *testing.B) {
+	ch := make(chan int, 128)
+	go func() {
+		for i := 0; i &lt; b.N; i++ {
+			ch &lt;- i
+		}
+		close(ch)
+	}()
+	for range ch {
+	}
+}
+</code></pre>
+<p>输出：</p>
+<pre><code>  Output:Windows:  N       Time 1 op   Operations per sec
+  sync      1000000  2443 ns/op  --&gt;  409 332 / s
+  buffered   1000000  4850 ns/op  --&gt;  810 477 / s
+  Linux:
+</code></pre>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="14.15.html">漏桶算法</a></li>
+  <li>下一节：<a href="14.17.html">使用通道并发访问对象</a></li>
+</ul>

@@ -1,0 +1,327 @@
+<h1><a href="#15-8-精巧的多功能网页服务器" name="15-8-精巧的多功能网页服务器"></a>15.8 精巧的多功能网页服务器</h1>
+<p>为进一步深入理解 <code>http</code> 包以及如何构建网页服务器功能，让我们来学习和体会下面的例子：先列出代码，然后给出不同功能的实现方法，程序输出显示在表格中。</p>
+<p>示例 15.20 <a href="examples/chapter_15/elaborated_webserver.go">elaborated_webserver.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;bytes&quot;
+	&quot;expvar&quot;
+	&quot;flag&quot;
+	&quot;fmt&quot;
+	&quot;io&quot;
+	&quot;log&quot;
+	&quot;net/http&quot;
+	&quot;os&quot;
+	&quot;strconv&quot;
+)
+
+// hello world, the web server
+var helloRequests = expvar.NewInt(&quot;hello-requests&quot;)
+
+// flags:
+var webroot = flag.String(&quot;root&quot;, &quot;/home/user&quot;, &quot;web root directory&quot;)
+
+// simple flag server
+var booleanflag = flag.Bool(&quot;boolean&quot;, true, &quot;another flag for testing&quot;)
+
+// Simple counter server. POSTing to it will set the value.
+type Counter struct {
+	n int
+}
+
+// a channel
+type Chan chan int
+
+func main() {
+	flag.Parse()
+	http.Handle(&quot;/&quot;, http.HandlerFunc(Logger))
+	http.Handle(&quot;/go/hello&quot;, http.HandlerFunc(HelloServer))
+	// The counter is published as a variable directly.
+	ctr := new(Counter)
+	expvar.Publish(&quot;counter&quot;, ctr)
+	http.Handle(&quot;/counter&quot;, ctr)
+	// http.Handle(&quot;/go/&quot;, http.FileServer(http.Dir(&quot;/tmp&quot;))) // uses the OS filesystem
+	http.Handle(&quot;/go/&quot;, http.StripPrefix(&quot;/go/&quot;, http.FileServer(http.Dir(*webroot))))
+	http.Handle(&quot;/flags&quot;, http.HandlerFunc(FlagServer))
+	http.Handle(&quot;/args&quot;, http.HandlerFunc(ArgServer))
+	http.Handle(&quot;/chan&quot;, ChanCreate())
+	http.Handle(&quot;/date&quot;, http.HandlerFunc(DateServer))
+	err := http.ListenAndServe(&quot;:12345&quot;, nil)
+	if err != nil {
+		log.Panicln(&quot;ListenAndServe:&quot;, err)
+	}
+}
+
+func Logger(w http.ResponseWriter, req *http.Request) {
+	log.Print(req.URL.String())
+	w.WriteHeader(404)
+	w.Write([]byte(&quot;oops&quot;))
+}
+
+func HelloServer(w http.ResponseWriter, req *http.Request) {
+	helloRequests.Add(1)
+	io.WriteString(w, &quot;hello, world!\n&quot;)
+}
+
+// This makes Counter satisfy the expvar.Var interface, so we can export
+// it directly.
+func (ctr *Counter) String() string { return fmt.Sprintf(&quot;%d&quot;, ctr.n) }
+
+func (ctr *Counter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case &quot;GET&quot;: // increment n
+		ctr.n++
+	case &quot;POST&quot;: // set n to posted value
+		buf := new(bytes.Buffer)
+		io.Copy(buf, req.Body)
+		body := buf.String()
+		if n, err := strconv.Atoi(body); err != nil {
+			fmt.Fprintf(w, &quot;bad POST: %v\nbody: [%v]\n&quot;, err, body)
+		} else {
+			ctr.n = n
+			fmt.Fprint(w, &quot;counter reset\n&quot;)
+		}
+	}
+	fmt.Fprintf(w, &quot;counter = %d\n&quot;, ctr.n)
+}
+
+func FlagServer(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set(&quot;Content-Type&quot;, &quot;text/plain; charset=utf-8&quot;)
+	fmt.Fprint(w, &quot;Flags:\n&quot;)
+	flag.VisitAll(func(f *flag.Flag) {
+		if f.Value.String() != f.DefValue {
+			fmt.Fprintf(w, &quot;%s = %s [default = %s]\n&quot;, f.Name, f.Value.String(), f.DefValue)
+		} else {
+			fmt.Fprintf(w, &quot;%s = %s\n&quot;, f.Name, f.Value.String())
+		}
+	})
+}
+
+// simple argument server
+func ArgServer(w http.ResponseWriter, req *http.Request) {
+	for _, s := range os.Args {
+		fmt.Fprint(w, s, &quot; &quot;)
+	}
+}
+
+func ChanCreate() Chan {
+	c := make(Chan)
+	go func(c Chan) {
+		for x := 0; ; x++ {
+			c &lt;- x
+		}
+	}(c)
+	return c
+}
+
+func (ch Chan) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	io.WriteString(w, fmt.Sprintf(&quot;channel send #%d\n&quot;, &lt;-ch))
+}
+
+// exec a program, redirecting output
+func DateServer(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Set(&quot;Content-Type&quot;, &quot;text/plain; charset=utf-8&quot;)
+	r, w, err := os.Pipe()
+	if err != nil {
+		fmt.Fprintf(rw, &quot;pipe: %s\n&quot;, err)
+		return
+	}
+
+	p, err := os.StartProcess(&quot;/bin/date&quot;, []string{&quot;date&quot;}, &amp;os.ProcAttr{Files: []*os.File{nil, w, w}})
+	defer r.Close()
+	w.Close()
+	if err != nil {
+		fmt.Fprintf(rw, &quot;fork/exec: %s\n&quot;, err)
+		return
+	}
+	defer p.Release()
+	io.Copy(rw, r)
+	wait, err := p.Wait()
+	if err != nil {
+		fmt.Fprintf(rw, &quot;wait: %s\n&quot;, err)
+		return
+	}
+	if !wait.Exited() {
+		fmt.Fprintf(rw, &quot;date: %v\n&quot;, wait)
+		return
+	}
+}
+</code></pre>
+<table>
+  <thead>
+    <tr>
+      <th>处理函数 </th>
+      <th>调用 URL </th>
+      <th>浏览器获得响应</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Logger </td>
+      <td><a href="http://localhost:12345/">http://localhost:12345/</a> （根） </td>
+      <td>oops</td>
+    </tr>
+  </tbody>
+</table>
+<p><code>Logger</code> 处理函数用 <code>w.WriteHeader(404)</code> 来输出 “404 Not Found”头部。</p>
+<p>此项技术通常很有用，无论何时服务器执行代码产生错误，都可以应用类似这样的代码：</p>
+<pre><code class="go">if err != nil {
+	w.WriteHeader(400)
+	return
+}
+</code></pre>
+<p>另外利用 <code>logger</code> 包的函数，针对每个请求在服务器端命令行打印日期、时间和 URL。</p>
+<table>
+  <thead>
+    <tr>
+      <th>处理函数 </th>
+      <th>调用 URL </th>
+      <th>浏览器获得响应</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>HelloServer </td>
+      <td><a href="http://localhost:12345/go/hello">http://localhost:12345/go/hello</a> </td>
+      <td>hello, world!</td>
+    </tr>
+  </tbody>
+</table>
+<p>包 <code>expvar</code> 可以创建（Int，Float 和 String 类型）变量，并将它们发布为公共变量。它会在 HTTP URL <code>/debug/vars</code> 上以 JSON 格式公布。通常它被用于服务器操作计数。<code>helloRequests</code> 就是这样一个 <code>int64</code> 变量，该处理函数对其加 1，然后写入“hello world!”到浏览器。</p>
+<table>
+  <thead>
+    <tr>
+      <th>处理函数 </th>
+      <th>调用 URL </th>
+      <th>浏览器获得响应</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Counter </td>
+      <td><a href="http://localhost:12345/counter">http://localhost:12345/counter</a> </td>
+      <td>counter = 1</td>
+    </tr>
+    <tr>
+      <td>Counter </td>
+      <td>刷新（GET 请求） </td>
+      <td>counter = 2</td>
+    </tr>
+  </tbody>
+</table>
+<p>计数器对象 <code>ctr</code> 有一个 <code>String()</code> 方法，所以它实现了 <code>expvar.Var</code> 接口。这使其可以被发布，尽管它是一个结构体。<code>ServeHTTP</code> 函数使 <code>ctr</code> 成为处理器，因为它的签名正确实现了 <code>http.Handler</code> 接口。</p>
+<table>
+  <thead>
+    <tr>
+      <th>处理函数 </th>
+      <th>调用 URL </th>
+      <th>浏览器获得响应</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>FileServer </td>
+      <td><a href="http://localhost:12345/go/ggg.html">http://localhost:12345/go/ggg.html</a> </td>
+      <td>404 page not found</td>
+    </tr>
+  </tbody>
+</table>
+<p><code>FileServer(root FileSystem) Handler</code> 返回一个处理器，它以 <code>root</code> 作为根，用文件系统的内容响应 HTTP 请求。要获得操作系统的文件系统，用 <code>http.Dir</code>，例如：</p>
+<pre><code class="go">http.Handle(&quot;/go/&quot;, http.FileServer(http.Dir(&quot;/tmp&quot;)))
+</code></pre>
+<table>
+  <thead>
+    <tr>
+      <th>处理函数 </th>
+      <th>调用 URL </th>
+      <th>浏览器获得响应</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>FlagServer </td>
+      <td><a href="http://localhost:12345/flags">http://localhost:12345/flags</a> </td>
+      <td>Flags: boolean = true root = /home/rsc</td>
+    </tr>
+  </tbody>
+</table>
+<p>该处理函数使用了 <code>flag</code> 包。<code>VisitAll</code> 函数迭代所有的标签（flag），打印它们的名称、值和默认值（当不同于“值”时）。</p>
+<table>
+  <thead>
+    <tr>
+      <th>处理函数 </th>
+      <th>调用 URL </th>
+      <th>浏览器获得响应</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ArgServer </td>
+      <td><a href="http://localhost:12345/args">http://localhost:12345/args</a> </td>
+      <td>./elaborated_webserver.exe</td>
+    </tr>
+  </tbody>
+</table>
+<p>该处理函数迭代 <code>os.Args</code> 以打印出所有的命令行参数。如果没有指定则只有程序名称（可执行程序的路径）会被打印出来。</p>
+<table>
+  <thead>
+    <tr>
+      <th>处理函数 </th>
+      <th>调用 URL </th>
+      <th>浏览器获得响应</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Channel </td>
+      <td><a href="http://localhost:12345/chan">http://localhost:12345/chan</a> </td>
+      <td>channel send #1</td>
+    </tr>
+    <tr>
+      <td>Channel </td>
+      <td>刷新 </td>
+      <td>channel send #2</td>
+    </tr>
+  </tbody>
+</table>
+<p>每当有新请求到达，通道的 <code>ServeHTTP</code> 方法从通道获取下一个整数并显示。由此可见，网页服务器可以从通道中获取要发送的响应，它可以由另一个函数产生（甚至是客户端）。下面的代码片段正是一个这样的处理函数，但会在 30 秒后超时：</p>
+<pre><code class="go">func ChanResponse(w http.ResponseWriter, req *http.Request) {
+	timeout := make (chan bool)
+	go func () {
+		time.Sleep(30e9)
+		timeout &lt;- true
+	}()
+	select {
+	case msg := &lt;-messages:
+		io.WriteString(w, msg)
+	case stop := &lt;-timeout:
+		return
+	}
+}
+</code></pre>
+<table>
+  <thead>
+    <tr>
+      <th>处理函数 </th>
+      <th>调用 URL </th>
+      <th>浏览器获得响应</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>DateServer </td>
+      <td><a href="http://localhost:12345/date">http://localhost:12345/date</a> </td>
+      <td>显示当前时间（由于是调用 /bin/date，仅在 Unix 下有效）</td>
+    </tr>
+  </tbody>
+</table>
+<p>可能的输出：<code>Thu Sep 8 12:41:09 CEST 2011</code>。</p>
+<p><code>os.Pipe()</code> 返回一对相关联的 <code>File</code>，从 <code>r</code> 读取数据，返回已读取的字节数来自于 <code>w</code> 的写入。函数返回这两个文件和错误，如果有的话：</p>
+<pre><code class="go">func Pipe() (r *File, w *File, err error)
+</code></pre>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="15.7.html">探索 template 包</a></li>
+  <li>下一节：<a href="15.9.html">用 rpc 实现远程过程调用</a></li>
+</ul>

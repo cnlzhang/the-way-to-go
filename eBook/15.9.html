@@ -1,0 +1,97 @@
+<h1><a href="#15-9-用-rpc-实现远程过程调用" name="15-9-用-rpc-实现远程过程调用"></a>15.9 用 rpc 实现远程过程调用</h1>
+<p>Go 程序之间可以使用 <code>net/rpc</code> 包实现相互通信，这是另一种客户端-服务器应用场景。它提供了一种方便的途径，通过网络连接调用远程函数。当然，仅当程序运行在不同机器上时，这项技术才实用。<code>rpc</code> 包建立在 <code>gob</code> 包之上（见 <a href="12.11.html">12.11节</a>），实现了自动编码/解码传输的跨网络方法调用。</p>
+<p>服务器端需要注册一个对象实例，与其类型名一起，使之成为一项可见的服务：它允许远程客户端跨越网络或其他 I/O 连接访问此对象已导出的方法。总之就是在网络上暴露类型的方法。</p>
+<p><code>rpc</code> 包使用了 http 和 tcp 协议，以及用于数据传输的 <code>gob</code> 包。服务器端可以注册多个不同类型的对象（服务），但同一类型的多个对象会产生错误。</p>
+<p>我们讨论一个简单的例子：定义一个类型 <code>Args</code> 及其方法 <code>Multiply</code>，完美地置于单独的包中。方法必须返回可能的错误。</p>
+<p>示例15.21 <a href="examples/chapter_15/rpc/rpc_objects.go">rpc_objects.go</a></p>
+<pre><code class="go">package rpc_objects
+
+import &quot;net&quot;
+
+type Args struct {
+	N, M int
+}
+
+func (t *Args) Multiply(args *Args, reply *int) net.Error {
+	*reply = args.N * args.M
+	return nil
+}
+</code></pre>
+<p>（**译注：Go 当前版本要求此方法返回类型为 <code>error</code>，以上示例中返回 <code>net.Error</code> 已无法通过编译，见更新后的<a href="examples/chapter_15/rpc_updated/rpc_objects/rpc_objects.go">rpc_objects.go</a>。**）</p>
+<p>服务器端产生一个 <code>rpc_objects.Args</code> 类型的对象 <code>calc</code>，并用 <code>rpc.Register(object)</code> 注册。调用 <code>HandleHTTP()</code>，然后用 <code>net.Listen</code> 在指定的地址上启动监听。也可以按名称来注册对象，例如：<code>rpc.RegisterName(&quot;Calculator&quot;, calc)</code>。</p>
+<p>以协程启动 <code>http.Serve(listener, nil)</code> 后，会为每一个进入 <code>listener</code> 的 HTTP 连接创建新的服务线程。我们必须用诸如 <code>time.Sleep(1000e9)</code> 来使服务器在一段时间内保持运行状态。</p>
+<p>示例 15.22 <a href="examples/chapter_15/rpc/rpc_server.go">rpc_server.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;net/http&quot;
+	&quot;log&quot;
+	&quot;net&quot;
+	&quot;net/rpc&quot;
+	&quot;time&quot;
+	&quot;./rpc_objects&quot;
+)
+
+func main() {
+	calc := new(rpc_objects.Args)
+	rpc.Register(calc)
+	rpc.HandleHTTP()
+	listener, e := net.Listen(&quot;tcp&quot;, &quot;localhost:1234&quot;)
+	if e != nil {
+		log.Fatal(&quot;Starting RPC-server -listen error:&quot;, e)
+	}
+	go http.Serve(listener, nil)
+	time.Sleep(1000e9)
+}
+</code></pre>
+<p>输出：</p>
+<pre><code>Starting Process E:/Go/GoBoek/code_examples/chapter_14/rpc_server.exe ...
+** 5 秒后： **
+End Process exit status 0
+</code></pre>
+<p>客户端必须知晓对象类型及其方法的定义。执行 <code>rpc.DialHTTP()</code> 连接到服务器后，就可以用 <code>client.Call(&quot;Type.Method&quot;, args, &amp;reply)</code> 调用远程对象的方法。<code>Type</code> 是远程对象的类型名，<code>Method</code> 是要调用的方法，<code>args</code> 是用 Args 类型初始化的对象，<code>reply</code> 是一个必须事先声明的变量，方法调用产生的结果将存入其中。</p>
+<p>示例 15.23 <a href="examples/chapter_15/rpc/rpc_client.go">rpc_client.go</a></p>
+<pre><code class="go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;log&quot;
+	&quot;net/rpc&quot;
+	&quot;./rpc_objects&quot;
+)
+
+const serverAddress = &quot;localhost&quot;
+
+func main() {
+	client, err := rpc.DialHTTP(&quot;tcp&quot;, serverAddress + &quot;:1234&quot;)
+	if err != nil {
+		log.Fatal(&quot;Error dialing:&quot;, err)
+	}
+	// Synchronous call
+	args := &amp;rpc_objects.Args{7, 8}
+	var reply int
+	err = client.Call(&quot;Args.Multiply&quot;, args, &amp;reply)
+	if err != nil {
+		log.Fatal(&quot;Args error:&quot;, err)
+	}
+	fmt.Printf(&quot;Args: %d * %d = %d&quot;, args.N, args.M, reply)
+}
+</code></pre>
+<p>先启动服务器，再运行客户端，然后就能得到如下输出结果：</p>
+<pre><code>Starting Process E:/Go/GoBoek/code_examples/chapter_14/rpc_client.exe ...
+
+Args: 7 * 8 = 56
+End Process exit status 0
+</code></pre>
+<p>该远程调用以同步方式进行，它会等待服务器返回结果。也可使用如下方式异步地执行调用：</p>
+<pre><code class="go">call1 := client.Go(&quot;Args.Multiply&quot;, args, &amp;reply, nil)
+replyCall := &lt;- call1.Done
+</code></pre>
+<p>如果最后一个参数值为 <code>nil</code> ，调用完成后会创建一个新的通道。</p>
+<p>如果你有一个以 root 管理员身份运行的 Go 服务器，想要以不同的用户身份运行某部分代码，Brad Fitz 利用 <code>rpc</code> 写的 <code>go-runas</code> 包可以完成任务：<a href="https://github.com/bradfitz/go-runas">https://github.com/bradfitz/go-runas</a>。我们将会在 19 章看到一个完整的项目，它是一个使用了 <code>rpc</code> 的应用程序。</p>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="15.8.html">精巧的多功能网页服务器</a></li>
+  <li>下一节：<a href="15.10.html">基于网络的通道 netchan</a></li>
+</ul>

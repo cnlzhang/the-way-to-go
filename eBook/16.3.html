@@ -1,0 +1,30 @@
+<h1><a href="#16-3-发生错误时使用-defer-关闭一个文件" name="16-3-发生错误时使用-defer-关闭一个文件"></a>16.3 发生错误时使用 defer 关闭一个文件</h1>
+<p>如果你在一个for循环内部处理一系列文件，你需要使用defer确保文件在处理完毕后被关闭，例如：</p>
+<pre><code class="go">for _, file := range files {
+    if f, err = os.Open(file); err != nil {
+        return
+    }
+    // 这是错误的方式，当循环结束时文件没有关闭
+    defer f.Close()
+    // 对文件进行操作
+    f.Process(data)
+}
+</code></pre>
+<p>但是在循环结尾处的defer没有执行，所以文件一直没有关闭！垃圾回收机制可能会自动关闭文件，但是这会产生一个错误，更好的做法是：</p>
+<pre><code class="go">for _, file := range files {
+    if f, err = os.Open(file); err != nil {
+        return
+    }
+    // 对文件进行操作
+    f.Process(data)
+    // 关闭文件
+    f.Close()
+ }
+</code></pre>
+<p><strong>defer仅在函数返回时才会执行，在循环的结尾或其他一些有限范围的代码内不会执行。</strong></p>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="16.2.html">误用字符串</a></li>
+  <li>下一节：<a href="16.4.html">何时使用new()和make()</a></li>
+</ul>

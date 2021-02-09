@@ -1,0 +1,24 @@
+<h1><a href="#18-4-结构体" name="18-4-结构体"></a>18.4 结构体</h1>
+<p>创建：</p>
+<pre><code class="go">type struct1 struct {
+    field1 type1
+    field2 type2
+    …
+}
+ms := new(struct1)
+</code></pre>
+<p>初始化：</p>
+<pre><code class="go">ms := &amp;struct1{10, 15.5, &quot;Chris&quot;}
+</code></pre>
+<p>当结构体的命名以大写字母开头时，该结构体在包外可见。<br/>通常情况下，为每个结构体定义一个构建函数，并推荐使用构建函数初始化结构体（参考<a href="examples/chapter_10/person.go">例10.2</a>）：</p>
+<pre><code class="go    ">ms := Newstruct1{10, 15.5, &quot;Chris&quot;}
+func Newstruct1(n int, f float32, name string) *struct1 {
+    return &amp;struct1{n, f, name} 
+}
+</code></pre>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="18.3.html">映射</a></li>
+  <li>下一节：<a href="18.5.html">接口</a></li>
+</ul>

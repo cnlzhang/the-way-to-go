@@ -1,0 +1,62 @@
+<h1><a href="#8-2-测试键值对是否存在及删除元素" name="8-2-测试键值对是否存在及删除元素"></a>8.2 测试键值对是否存在及删除元素</h1>
+<p>测试 map1 中是否存在 key1：</p>
+<p>在例子 8.1 中，我们已经见过可以使用 <code>val1 = map1[key1]</code> 的方法获取 key1 对应的值 val1。如果 map 中不存在 key1，val1 就是一个值类型的空值。</p>
+<p>这就会给我们带来困惑了：现在我们没法区分到底是 key1 不存在还是它对应的 value 就是空值。</p>
+<p>为了解决这个问题，我们可以这么用：<code>val1, isPresent = map1[key1]</code></p>
+<p>isPresent 返回一个 bool 值：如果 key1 存在于 map1，val1 就是 key1 对应的 value 值，并且 isPresent为true；如果 key1 不存在，val1 就是一个空值，并且 isPresent 会返回 false。</p>
+<p>如果你只是想判断某个 key 是否存在而不关心它对应的值到底是多少，你可以这么做：</p>
+<pre><code class="go">_, ok := map1[key1] // 如果key1存在则ok == true，否则ok为false
+</code></pre>
+<p>或者和 if 混合使用：</p>
+<pre><code class="go">if _, ok := map1[key1]; ok {
+	// ...
+}
+</code></pre>
+<p>从 map1 中删除 key1：</p>
+<p>直接 <code>delete(map1, key1)</code> 就可以。</p>
+<p>如果 key1 不存在，该操作不会产生错误。</p>
+<p>示例 8.4 <a href="examples/chapter_8/map_testelement.go">map_testelement.go</a></p>
+<pre><code class="go">package main
+import &quot;fmt&quot;
+
+func main() {
+	var value int
+	var isPresent bool
+
+	map1 := make(map[string]int)
+	map1[&quot;New Delhi&quot;] = 55
+	map1[&quot;Beijing&quot;] = 20
+	map1[&quot;Washington&quot;] = 25
+	value, isPresent = map1[&quot;Beijing&quot;]
+	if isPresent {
+		fmt.Printf(&quot;The value of \&quot;Beijing\&quot; in map1 is: %d\n&quot;, value)
+	} else {
+		fmt.Printf(&quot;map1 does not contain Beijing&quot;)
+	}
+
+	value, isPresent = map1[&quot;Paris&quot;]
+	fmt.Printf(&quot;Is \&quot;Paris\&quot; in map1 ?: %t\n&quot;, isPresent)
+	fmt.Printf(&quot;Value is: %d\n&quot;, value)
+
+	// delete an item:
+	delete(map1, &quot;Washington&quot;)
+	value, isPresent = map1[&quot;Washington&quot;]
+	if isPresent {
+		fmt.Printf(&quot;The value of \&quot;Washington\&quot; in map1 is: %d\n&quot;, value)
+	} else {
+		fmt.Println(&quot;map1 does not contain Washington&quot;)
+	}
+}
+</code></pre>
+<p>输出结果：</p>
+<pre><code>The value of &quot;Beijing&quot; in map1 is: 20
+Is &quot;Paris&quot; in map1 ?: false
+Value is: 0
+map1 does not contain Washington
+</code></pre>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="08.1.html">声明、初始化和 make</a></li>
+  <li>下一节：<a href="08.3.html">for-range 的配套用法</a></li>
+</ul>

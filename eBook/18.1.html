@@ -1,0 +1,41 @@
+<h1><a href="#18-1-字符串" name="18-1-字符串"></a>18.1 字符串</h1>
+<p>（1）如何修改字符串中的一个字符：</p>
+<pre><code class="go">str:=&quot;hello&quot;
+c:=[]byte(str)
+c[0]=&#39;c&#39;
+s2:= string(c) // s2 == &quot;cello&quot;
+</code></pre>
+<p>（2）如何获取字符串的子串：</p>
+<pre><code class="go">substr := str[n:m]
+</code></pre>
+<p>（3）如何使用<code>for</code>或者<code>for-range</code>遍历一个字符串：</p>
+<pre><code class="go">// gives only the bytes:
+for i:=0; i &lt; len(str); i++ {
+… = str[i]
+}
+// gives the Unicode characters:
+for ix, ch := range str {
+…
+}
+</code></pre>
+<p>（4）如何获取一个字符串的字节数：<code>len(str)</code></p>
+<p>如何获取一个字符串的字符数：</p>
+<p>最快速：<code>utf8.RuneCountInString(str)</code> </p>
+<p><code>len([]rune(str))</code> </p>
+<p>（5）如何连接字符串：</p>
+<p>最快速：<br/><code>with a bytes.Buffer</code>（参考<a href="07.2.html">章节7.2</a>）</p>
+<p><code>Strings.Join()</code>（参考<a href="04.7.html">章节4.7</a>）</p>
+<p>使用<code>+=</code>：</p>
+<p><code>go
+ str1 := &quot;Hello &quot; 
+ str2 := &quot;World!&quot;
+ str1 += str2 //str1 == &quot;Hello World!&quot;
+</code></p>
+<p>（6）如何解析命令行参数：使用<code>os</code>或者<code>flag</code>包</p>
+<p>（参考<a href="examples/chapter_12/fileinput.go">例12.4</a>）</p>
+<h2><a href="#链接" name="链接"></a>链接</h2>
+<ul>
+  <li><a href="directory.html">目录</a></li>
+  <li>上一节：<a href="18.0.html">出于性能考虑的实用代码片段</a></li>
+  <li>下一节：<a href="18.2.html">数组和切片</a></li>
+</ul>
